@@ -977,15 +977,49 @@ Mautic.activateChosenSelect = function(el, ignoreGlobal, jQueryVariant) {
         multiPlaceholder = singlePlaceholder = mQuery(el).data('chosen-placeholder');
     }
 
+    var allowAdd = mQuery(el).attr('data-allow-add') === 'true';
+
     mQuery(el).chosen({
         placeholder_text_multiple: multiPlaceholder,
         placeholder_text_single: singlePlaceholder,
-        no_results_text: noResultsText,
+        no_results_text: allowAdd ? (mauticLang['mautic.core.lookup.type_to_add'] || 'Type and press Enter to add') : noResultsText,
         width: "100%",
         allow_single_deselect: true,
         include_group_label_in_selected: true,
         search_contains: true
     });
+
+    // Enable free-form input for fields with data-allow-add="true"
+    if (allowAdd) {
+        var $select = mQuery(el);
+        var $chosenContainer = $select.next('.chosen-container');
+        var $searchField = $chosenContainer.find('.chosen-search-input');
+
+        $searchField.on('keydown', function(e) {
+            if (e.keyCode === 13 || e.keyCode === 9) { // Enter or Tab
+                var searchText = mQuery(this).val().trim();
+                if (searchText && $chosenContainer.find('.no-results').length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    var exists = $select.find('option').filter(function() {
+                        return mQuery(this).val().toLowerCase() === searchText.toLowerCase();
+                    }).length > 0;
+
+                    if (!exists) {
+                        var $newOption = mQuery('<option></option>')
+                            .attr('value', searchText)
+                            .text(searchText)
+                            .prop('selected', true);
+                        $select.append($newOption);
+                        $select.trigger('chosen:updated');
+                        $select.trigger('change');
+                    }
+                    mQuery(this).val('');
+                }
+            }
+        });
+    }
 
     if (isLookup) {
         var searchTerm = mQuery(el).attr('data-model');
