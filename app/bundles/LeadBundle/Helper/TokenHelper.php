@@ -13,10 +13,10 @@ class TokenHelper
     private static $parameters;
 
     /**
-     * @param string $content
-     * @param array  $lead
-     * @param bool   $replace If true, search/replace will be executed on $content and the modified $content returned
-     *                        rather than an array of found matches
+     * @param string|array $content
+     * @param array        $lead
+     * @param bool         $replace If true, search/replace will be executed on $content and the modified $content returned
+     *                              rather than an array of found matches
      *
      * @return array|string
      */
@@ -24,6 +24,16 @@ class TokenHelper
     {
         if (!$lead) {
             return $replace ? $content : [];
+        }
+
+        // Handle array content (e.g., from collection fields) by converting to JSON string
+        if (is_array($content)) {
+            $content = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        // Ensure content is a string
+        if (!is_string($content)) {
+            $content = (string) $content;
         }
 
         // Search for bracket or bracket encoded
@@ -83,6 +93,11 @@ class TokenHelper
                     break;
                 }
             }
+        }
+
+        // Convert array values (e.g., from collection fields) to JSON string
+        if (is_array($value)) {
+            $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
         if ('' !== $value) {
