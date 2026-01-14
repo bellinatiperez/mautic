@@ -135,11 +135,15 @@ trait CustomFieldEntityTrait
                 if ('' === $oldValue) {
                     $oldValue = null;
                 }
+            } elseif ($field && 'collection' === $field['type']) {
+                // Handle string input for collection (e.g., from import CSV)
+                $newValues = array_map('trim', explode(',', $value));
+                $value = $this->mergeCollectionValues($oldValue, $newValues);
             }
         } elseif (is_array($value)) {
-            // Check if this is a collection type field - use JSON encoding
+            // Check if this is a collection type field - use JSON encoding with incremental merge
             if ($field && 'collection' === $field['type']) {
-                $value = json_encode(array_values(array_filter($value, fn ($v) => '' !== $v && null !== $v)));
+                $value = $this->mergeCollectionValues($oldValue, $value);
             } else {
                 // Existing behavior for multiselect - flatten with pipe
                 $value = implode('|', $value);
@@ -266,6 +270,68 @@ trait CustomFieldEntityTrait
         $this->eventData[$key] = $value;
 
         return $this;
+    }
+
+    /**
+     * Merge new values into existing collection array.
+     * New values are prepended in the exact order they were imported.
+     * Existing values that are re-imported are moved to their new position.
+     *
+     * @param string|null $oldValue  JSON encoded existing values
+     * @param array       $newValues New values to add
+     *
+     * @return string JSON encoded merged array
+     */
+    private function mergeCollectionValues($oldValue, array $newValues): string
+    {
+        // Filter and normalize new values (ensure strings, trim whitespace)
+        $newValues = array_values(array_filter(
+            array_map(fn ($v) => is_string($v) ? trim($v) : (string) $v, $newValues),
+            fn ($v) => '' !== $v
+        ));
+
+        if (empty($newValues)) {
+            return $oldValue ?? '[]';
+        }
+
+        // Get existing values from JSON
+        $existingValues = [];
+        if (!empty($oldValue) && is_string($oldValue)) {
+            $decoded = json_decode($oldValue, true);
+            if (JSON_ERROR_NONE === json_last_error() && is_array($decoded)) {
+                // Normalize existing values too
+                $existingValues = array_values(array_filter(
+                    array_map(fn ($v) => is_string($v) ? trim($v) : (string) $v, $decoded),
+                    fn ($v) => '' !== $v
+                ));
+            }
+        }
+
+        // Build set of new values for quick lookup
+        $newSet = [];
+        foreach ($newValues as $val) {
+            $newSet[$val] = true;
+        }
+
+        // Remove duplicates from new values (keep first occurrence, preserve order)
+        $newUnique = [];
+        foreach ($newValues as $newValue) {
+            if (!isset($newUnique[$newValue])) {
+                $newUnique[$newValue] = true;
+            }
+        }
+
+        // Build final array: new values first (in exact import order)
+        $merged = array_keys($newUnique);
+
+        // Append existing values that are NOT in new values
+        foreach ($existingValues as $existingValue) {
+            if (!isset($newSet[$existingValue])) {
+                $merged[] = $existingValue;
+            }
+        }
+
+        return json_encode(array_values($merged), JSON_UNESCAPED_UNICODE);
     }
 
     protected static function loadFixedFieldMetadata(ClassMetadataBuilder $builder, array $fields, array $customFieldDefinitions)

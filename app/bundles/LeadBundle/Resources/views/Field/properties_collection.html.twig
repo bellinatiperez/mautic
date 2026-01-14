@@ -14,6 +14,12 @@
                     <option value="float" {% if properties.value_type|default('') == 'float' %}selected{% endif %}>
                         {{ 'mautic.lead.field.collection.type.float'|trans }}
                     </option>
+                    <option value="phone" {% if properties.value_type|default('') == 'phone' %}selected{% endif %}>
+                        {{ 'mautic.lead.field.collection.type.phone'|trans }}
+                    </option>
+                    <option value="email" {% if properties.value_type|default('') == 'email' %}selected{% endif %}>
+                        {{ 'mautic.lead.field.collection.type.email'|trans }}
+                    </option>
                 </select>
             </div>
         </div>
